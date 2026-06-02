@@ -1,0 +1,13 @@
+[project]
+name = "sus-lakehouse"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pandas>=2.3.3",
+    "plotly>=6.7.0",
+    "pyarrow>=24.0.0",
+    "pysus>=2.2.0",
+    "streamlit>=1.58.0",
+]
