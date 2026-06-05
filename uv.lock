@@ -1575,6 +1575,7 @@ name = "sus-lakehouse"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "duckdb" },
     { name = "pandas" },
     { name = "plotly" },
     { name = "pyarrow" },
@@ -1584,6 +1585,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "duckdb", specifier = ">=1.5.3" },
     { name = "pandas", specifier = ">=2.3.3" },
     { name = "plotly", specifier = ">=6.7.0" },
     { name = "pyarrow", specifier = ">=24.0.0" },
