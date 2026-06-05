@@ -60,11 +60,12 @@ def chart_total_cost(df):
     )
     st.plotly_chart(fig)
 
-def chart_mortality_rate(df):
-    query = """
-        SELECT DIAG_PRINC, AVG(MORTE) as avg_morte 
+def chart_mortality_rate(df, min_cases):
+    query = f"""
+        SELECT DIAG_PRINC, ROUND(AVG(MORTE) * 100, 2) as avg_morte 
         FROM df 
         GROUP BY DIAG_PRINC 
+        HAVING COUNT(*) > {min_cases}
         ORDER BY avg_morte DESC 
         LIMIT 10
     """
@@ -73,7 +74,7 @@ def chart_mortality_rate(df):
         result,
         x="DIAG_PRINC",
         y="avg_morte",
-        title="Mortality Rate by Diagnosis",
+        title="Mortality Rate by Diagnosis (%)",
         labels={
             "DIAG_PRINC": "Diagnosis (CID-10)",
             "avg_morte": "Mortality Rate"
@@ -85,10 +86,13 @@ def chart_mortality_rate(df):
 
 # Loading the data and adjusting data types
 df = load_data()
+
+st.subheader("Filters")
+min_cases = st.slider("Minimum number of cases", min_value=10, max_value=1000, value=100)
 col1, col2, col3 = st.columns(3)
 with col1:
     chart_avg_length_of_stay(df)
 with col2:
     chart_total_cost(df)
 with col3:
-    chart_mortality_rate(df)
+    chart_mortality_rate(df, min_cases)
