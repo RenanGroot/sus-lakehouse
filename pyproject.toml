@@ -6,9 +6,12 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "duckdb>=1.5.3",
+    "google-cloud-bigquery>=3.41.0",
+    "google-cloud-storage>=3.11.0",
     "pandas>=2.3.3",
     "plotly>=6.7.0",
     "pyarrow>=24.0.0",
     "pysus>=2.2.0",
+    "python-dotenv>=1.2.2",
     "streamlit>=1.58.0",
 ]
