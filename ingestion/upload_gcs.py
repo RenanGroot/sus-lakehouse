@@ -43,4 +43,5 @@ def upload_all_files():
         upload_blob(BUCKET_NAME, file, file.name)
     logging.info("Uploads finished")
 
-upload_all_files()
+if __name__ == "__main__":
+    upload_all_files()
