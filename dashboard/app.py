@@ -1,8 +1,15 @@
+import os
 import streamlit as st
 import pandas as pd
 from pathlib import Path
 import duckdb
 import plotly.express as px
+from google.cloud import bigquery
+from dotenv import load_dotenv
+
+load_dotenv()
+
+project_id = os.getenv("GCP_PROJECT_ID")
 
 # Steamlit setup
 st.set_page_config(page_title="SUS Lakehouse", layout="wide")
@@ -10,8 +17,9 @@ st.title("SIH/SUS — São Paulo 2024")
 
 @st.cache_data
 def load_data() -> pd.DataFrame:
-    folder_data = Path("data/raw")
-    df = pd.concat([pd.read_parquet(file) for file in folder_data.glob("*.parquet")])
+    client = bigquery.Client()
+    query = f"SELECT DIAG_PRINC, DIAS_PERM, VAL_TOT, MORTE FROM `{project_id}.sih_raw.SP24`"
+    df = client.query(query).to_dataframe()
     df = df.astype({"DIAS_PERM":"int32", "VAL_TOT":"float32", "MORTE":"int8"})
     return df
 
