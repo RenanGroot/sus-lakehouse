@@ -17,6 +17,12 @@ st.title("SIH/SUS — São Paulo 2024")
 
 @st.cache_data
 def load_data() -> pd.DataFrame:
+    """
+    Connects to BigQuery, query the data (SQL), and loads into cache as a pandas DataFrame.
+
+    Returns:
+        pandas.DataFrame
+    """
     client = bigquery.Client()
     query = f"SELECT DIAG_PRINC, DIAS_PERM, VAL_TOT, MORTE FROM `{project_id}.sih_raw.SP24`"
     df = client.query(query).to_dataframe()
@@ -25,8 +31,17 @@ def load_data() -> pd.DataFrame:
 
 
 # Chart Functions
-
-def chart_avg_length_of_stay(df):
+def chart_avg_length_of_stay(df: pd.DataFrame) -> None:
+    """
+    Creates a Bar Chart with the average length of stay by the CID-10 diseases
+      through querying the data frame.
+    
+    Args:
+        df: Datasource as a DataFrame
+    
+    Returns:
+        None
+    """
     query = """
         SELECT DIAG_PRINC, AVG(DIAS_PERM) as avg_days 
         FROM df 
@@ -47,7 +62,17 @@ def chart_avg_length_of_stay(df):
     )
     st.plotly_chart(fig)
 
-def chart_total_cost(df):
+def chart_total_cost(df: pd.DataFrame) -> None:
+    """
+    Creates a Bar Chart with the total costs by the CID-10 diseases
+      through querying the data frame.
+    
+    Args:
+        df: Datasource as a DataFrame
+    
+    Returns:
+        None
+    """
     query = """
         SELECT DIAG_PRINC, SUM(VAL_TOT) as sum_totalval 
         FROM df 
@@ -68,7 +93,18 @@ def chart_total_cost(df):
     )
     st.plotly_chart(fig)
 
-def chart_mortality_rate(df, min_cases):
+def chart_mortality_rate(df: pd.DataFrame, min_cases: int) -> None:
+    """
+    Creates a Bar Chart with the mortality rate by the CID-10 diseases 
+    given a minimum threshold for the cases.
+    
+    Args:
+        df: Datasource as a DataFrame
+        min_cases: Minimum cases threshold
+    
+    Returns:
+        None
+    """
     query = f"""
         SELECT DIAG_PRINC, ROUND(AVG(MORTE) * 100, 2) as avg_morte 
         FROM df 
@@ -92,7 +128,6 @@ def chart_mortality_rate(df, min_cases):
 
 #Main
 
-# Loading the data and adjusting data types
 df = load_data()
 
 st.subheader("Filters")
