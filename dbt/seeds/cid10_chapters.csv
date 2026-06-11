@@ -1,0 +1,23 @@
+chapter,range_start,range_end,description
+I,A00,B99,Certain infectious and parasitic diseases
+II,C00,D48,Neoplasms
+III,D50,D89,Diseases of the blood
+IV,E00,E90,Endocrine nutritional and metabolic diseases
+V,F00,F99,Mental and behavioural disorders
+VI,G00,G99,Diseases of the nervous system
+VII,H00,H59,Diseases of the eye
+VIII,H60,H95,Diseases of the ear
+IX,I00,I99,Diseases of the circulatory system
+X,J00,J99,Diseases of the respiratory system
+XI,K00,K93,Diseases of the digestive system
+XII,L00,L99,Diseases of the skin
+XIII,M00,M99,Diseases of the musculoskeletal system
+XIV,N00,N99,Diseases of the genitourinary system
+XV,O00,O99,"Pregnancy, childbirth and the puerperium"
+XVI,P00,P96,Conditions originating in the perinatal period
+XVII,Q00,Q99,Congenital malformations
+XVIII,R00,R99,Symptoms signs and abnormal findings
+XIX,S00,T98,"Injury, poisoning and external causes"
+XX,V01,Y98,External causes of morbidity and mortality
+XXI,Z00,Z99,Factors influencing health status
+XXII,U00,U85,Codes for special purposes

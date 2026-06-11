@@ -1,0 +1,5 @@
+sources:
+  - name: sih_raw
+    schema: sih_raw
+    tables:
+      - name: SP24

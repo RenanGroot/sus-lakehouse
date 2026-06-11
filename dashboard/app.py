@@ -16,18 +16,20 @@ st.set_page_config(page_title="SUS Lakehouse", layout="wide")
 st.title("SIH/SUS — São Paulo 2024")
 
 @st.cache_data
-def load_data() -> pd.DataFrame:
+def load_data() -> dict:
     """
     Connects to BigQuery, query the data (SQL), and loads into cache as a pandas DataFrame.
 
     Returns:
-        pandas.DataFrame
+        dict
     """
     client = bigquery.Client()
-    query = f"SELECT DIAG_PRINC, DIAS_PERM, VAL_TOT, MORTE FROM `{project_id}.sih_raw.SP24`"
-    df = client.query(query).to_dataframe()
-    df = df.astype({"DIAS_PERM":"int32", "VAL_TOT":"float32", "MORTE":"int8"})
-    return df
+    marts ={}
+    marts_list = ["mart_avg_length_of_stay","mart_mortality_rate","mart_total_cost"]
+    for mart in marts_list:
+        query = f"SELECT * FROM `{project_id}.sih_raw.{mart}`"
+        marts[mart] = client.query(query).to_dataframe()
+    return marts
 
 
 # Chart Functions
@@ -42,21 +44,15 @@ def chart_avg_length_of_stay(df: pd.DataFrame) -> None:
     Returns:
         None
     """
-    query = """
-        SELECT DIAG_PRINC, AVG(DIAS_PERM) as avg_days 
-        FROM df 
-        GROUP BY DIAG_PRINC 
-        ORDER BY avg_days DESC 
-        LIMIT 10
-    """
-    result = duckdb.sql(query).df()
+    result = df.nlargest(10,"avg_days")
     fig = px.bar(
         result,
-        x="DIAG_PRINC",
+        x="diag_princ",
         y="avg_days",
+        hover_data=["description"],
         title="Average Days by Diagnosis",
         labels={
-            "DIAG_PRINC": "Diagnosis (CID-10)",
+            "diag_princ": "Diagnosis (CID-10)",
             "avg_days": "Average Length of Stay (days)"
         }
     )
@@ -73,21 +69,15 @@ def chart_total_cost(df: pd.DataFrame) -> None:
     Returns:
         None
     """
-    query = """
-        SELECT DIAG_PRINC, SUM(VAL_TOT) as sum_totalval 
-        FROM df 
-        GROUP BY DIAG_PRINC 
-        ORDER BY sum_totalval DESC 
-        LIMIT 10
-    """
-    result = duckdb.sql(query).df()
+    result = df.nlargest(10,"sum_totalval")
     fig = px.bar(
         result,
-        x="DIAG_PRINC",
+        x="diag_princ",
         y="sum_totalval",
+        hover_data=["description"],
         title="Total Cost Value by Diagnosis",
         labels={
-            "DIAG_PRINC": "Diagnosis (CID-10)",
+            "diag_princ": "Diagnosis (CID-10)",
             "sum_totalval": "Total Cost Value (reais)"
         }
     )
@@ -105,22 +95,15 @@ def chart_mortality_rate(df: pd.DataFrame, min_cases: int) -> None:
     Returns:
         None
     """
-    query = f"""
-        SELECT DIAG_PRINC, ROUND(AVG(MORTE) * 100, 2) as avg_morte 
-        FROM df 
-        GROUP BY DIAG_PRINC 
-        HAVING COUNT(*) > {min_cases}
-        ORDER BY avg_morte DESC 
-        LIMIT 10
-    """
-    result = duckdb.sql(query).df()
+    result = df[df['count_cases']>= min_cases].nlargest(10,"avg_morte")
     fig = px.bar(
         result,
-        x="DIAG_PRINC",
+        x="diag_princ",
         y="avg_morte",
+        hover_data=["description"],
         title="Mortality Rate by Diagnosis (%)",
         labels={
-            "DIAG_PRINC": "Diagnosis (CID-10)",
+            "diag_princ": "Diagnosis (CID-10)",
             "avg_morte": "Mortality Rate"
         }
     )
@@ -134,8 +117,8 @@ st.subheader("Filters")
 min_cases = st.slider("Minimum number of cases", min_value=10, max_value=1000, value=100)
 col1, col2, col3 = st.columns(3)
 with col1:
-    chart_avg_length_of_stay(df)
+    chart_avg_length_of_stay(df["mart_avg_length_of_stay"])
 with col2:
-    chart_total_cost(df)
+    chart_total_cost(df["mart_total_cost"])
 with col3:
-    chart_mortality_rate(df, min_cases)
+    chart_mortality_rate(df["mart_mortality_rate"], min_cases)
