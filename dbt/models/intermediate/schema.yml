@@ -1,14 +1,18 @@
 models:
   - name: int_internacoes
+    description:  "Intermediate model calculating costs per day and categorazing length of stay"
     columns:
     - name: description
+      description: "CID-10 Chapter's description"
       data_tests:
         - not_null
     - name: length_category
+      description:  "Length's categorization: Short(less than 3 days), Medium(3 up to 10 days), Long(more than 10 days)"
       data_tests:
         - accepted_values:
             arguments:
               values: ["short", "medium", "long"]
     - name: cost_per_day
+      description:  "Cost per day calculated as val_tot / dias_perm. Null when val_tot is 0 (multiple procedures billing rule)."
       data_tests:
         - positive_values

@@ -1,31 +1,41 @@
 models:
   - name: mart_avg_length_of_stay
+    description: "Mart model for aggregated data about length of stay for admissions"
     columns:
     - name: diag_princ
+      description:  "Primary diagnosis code (CID-10)."
       data_tests:
         - not_null
     - name: description
+      description: "CID-10 Chapter's description"
       data_tests:
         - not_null
   - name: mart_mortality_rate
+    description: "Mart model for aggregated data about mortality rate for admissions"
     columns:
     - name: diag_princ
+      description:  "Primary diagnosis code (CID-10)."
       data_tests:
         - not_null
     - name: description
+      description: "CID-10 Chapter's description"
       data_tests:
         - not_null
     - name: count_cases
       data_tests:
         - strictly_positive
   - name: mart_total_cost
+    description: "Mart model for aggregated data about costs for admissions"
     columns:
     - name: diag_princ
+      description: "Primary diagnosis code (CID-10)."
       data_tests:
         - not_null
     - name: description
+      description: "CID-10 Chapter's description"
       data_tests:
         - not_null
     - name: sum_totalval
+      description:  "Sum of total costs"
       data_tests:
         - positive_values

@@ -1,12 +1,19 @@
 sources:
   - name: sih_raw
+    description:  |
+      Raw SIH/RD hospitalization data from DATASUS (Brazilian Ministry of Health).
+      Files are downloaded from the DATASUS FTP server and stored as parquet in GCS.
+      Currently covers São Paulo state for 2024.
     schema: sih_raw
     tables:
       - name: SP24
+        description:  "Hospitalizations for São Paulo state in 2024, all months."
 models:
   - name: stg_sih_rd
+    description: "Staging model for SIH/RD data, with type casting and column standardization."
     columns:
     - name: diag_princ
+      description: "Primary diagnosis code (CID-10)."
       data_tests:
         - not_null
     - name: morte
