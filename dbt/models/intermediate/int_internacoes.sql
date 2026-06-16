@@ -21,4 +21,4 @@ SELECT
     c.description
 
 FROM stg_sih_rd as s
-LEFT JOIN cid10_chapters as c ON diag_princ BETWEEN c.range_start AND c.range_end
+LEFT JOIN cid10_chapters as c ON SUBSTR(diag_princ, 1, 3) BETWEEN c.range_start AND c.range_end

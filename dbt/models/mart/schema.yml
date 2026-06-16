@@ -1,0 +1,31 @@
+models:
+  - name: mart_avg_length_of_stay
+    columns:
+    - name: diag_princ
+      data_tests:
+        - not_null
+    - name: description
+      data_tests:
+        - not_null
+  - name: mart_mortality_rate
+    columns:
+    - name: diag_princ
+      data_tests:
+        - not_null
+    - name: description
+      data_tests:
+        - not_null
+    - name: count_cases
+      data_tests:
+        - strictly_positive
+  - name: mart_total_cost
+    columns:
+    - name: diag_princ
+      data_tests:
+        - not_null
+    - name: description
+      data_tests:
+        - not_null
+    - name: sum_totalval
+      data_tests:
+        - positive_values

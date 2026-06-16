@@ -3,3 +3,17 @@ sources:
     schema: sih_raw
     tables:
       - name: SP24
+models:
+  - name: stg_sih_rd
+    columns:
+    - name: diag_princ
+      data_tests:
+        - not_null
+    - name: morte
+      data_tests:
+        - not_null
+        - accepted_values:
+            arguments:
+              values: [0,1]
+              quote: false
+      

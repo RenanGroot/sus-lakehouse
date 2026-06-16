@@ -1,0 +1,14 @@
+models:
+  - name: int_internacoes
+    columns:
+    - name: description
+      data_tests:
+        - not_null
+    - name: length_category
+      data_tests:
+        - accepted_values:
+            arguments:
+              values: ["short", "medium", "long"]
+    - name: cost_per_day
+      data_tests:
+        - positive_values
