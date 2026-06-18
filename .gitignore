@@ -4,3 +4,10 @@ __pycache__/
 *.pyc
 .vscode/
 .env
+dbt/profiles.yml
+airflow/logs/
+airflow/plugins/
+airflow/config/
+airflow/build.log
+*.log
+dbt/.user.yml
