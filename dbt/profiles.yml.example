@@ -1,0 +1,18 @@
+sus_lakehouse:
+  outputs:
+    local:
+      type: bigquery
+      method: service-account
+      keyfile: /path/to/your/sa.json
+      project: your-project-id
+      dataset: sih_raw
+      location: southamerica-east1
+      threads: 1
+    cloud:
+      type: bigquery
+      method: oauth
+      project: your-project-id
+      dataset: sih_raw
+      location: southamerica-east1
+      threads: 1
+  target: local
