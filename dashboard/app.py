@@ -1,15 +1,9 @@
-import os
 import streamlit as st
 import pandas as pd
 from pathlib import Path
-import duckdb
 import plotly.express as px
 from google.cloud import bigquery
-from dotenv import load_dotenv
 
-load_dotenv()
-
-project_id = os.getenv("GCP_PROJECT_ID")
 
 # Steamlit setup
 st.set_page_config(page_title="SUS Lakehouse", layout="wide")
@@ -24,6 +18,7 @@ def load_data() -> dict:
         dict
     """
     client = bigquery.Client()
+    project_id = client.project
     marts ={}
     marts_list = ["mart_avg_length_of_stay","mart_mortality_rate","mart_total_cost"]
     for mart in marts_list:
