@@ -1,0 +1,4 @@
+pysus
+pyarrow
+google-cloud-storage
+python-dotenv
