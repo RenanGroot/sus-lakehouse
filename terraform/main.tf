@@ -134,3 +134,17 @@ resource "google_cloud_run_v2_service_iam_member" "streamlit_public" {
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
+
+# BigQuery external table pointing to GCS parquet files
+resource "google_bigquery_table" "sp24" {
+  dataset_id = google_bigquery_dataset.sih_raw.dataset_id
+  table_id   = "SP24"
+  
+  external_data_configuration {
+    autodetect    = true
+    source_format = "PARQUET"
+    source_uris   = ["gs://${google_storage_bucket.raw_data.name}/*.parquet"]
+  }
+  
+  deletion_protection = false
+}
