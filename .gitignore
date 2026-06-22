@@ -11,3 +11,6 @@ airflow/config/
 airflow/build.log
 *.log
 dbt/.user.yml
+terraform/.terraform/
+terraform/terraform.tfvars
+terraform/*.tfstate*
