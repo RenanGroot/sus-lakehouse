@@ -3,5 +3,5 @@ WITH int_internacoes as(
 )
 SELECT diag_princ, description, AVG(dias_perm) as avg_days
         FROM int_internacoes 
-        GROUP BY diag_princ, description
+        GROUP BY year, state, diag_princ, description
         ORDER BY avg_days DESC 

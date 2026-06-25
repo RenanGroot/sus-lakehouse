@@ -6,8 +6,11 @@ sources:
       Currently covers São Paulo state for 2024.
     schema: sih_raw
     tables:
-      - name: SP24
-        description:  "Hospitalizations for São Paulo state in 2024, all months."
+      - name: internacoes
+        description:  |
+          Hospitalization records partitioned by year and state. The Hive partition columns
+          'year' and 'state' are automatically exposed by BigQuery from the GCS folder structure
+          and are queryable as regular columns despite not being stored in the parquet files.
 models:
   - name: stg_sih_rd
     description: "Staging model for SIH/RD data, with type casting and column standardization."

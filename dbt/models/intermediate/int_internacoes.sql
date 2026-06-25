@@ -5,6 +5,8 @@ cid10_chapters AS(
     SELECT * FROM {{ref('cid10_chapters')}}
 )
 SELECT 
+    s.year,
+    s.state,
     s.diag_princ, 
     s.dias_perm, 
     s.val_tot, 
