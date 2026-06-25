@@ -65,7 +65,7 @@ resource "google_cloud_run_v2_job" "ingestion" {
   template {
     template {
       service_account = google_service_account.ingestion_runner.email
-      timeout         = "3600s"
+      timeout         = "14400s"
       
       containers {
         image = "${var.region}-docker.pkg.dev/${var.project_id}/sus-lakehouse/ingestion:latest"
@@ -136,15 +136,21 @@ resource "google_cloud_run_v2_service_iam_member" "streamlit_public" {
 }
 
 # BigQuery external table pointing to GCS parquet files
-resource "google_bigquery_table" "sp24" {
+resource "google_bigquery_table" "internacoes" {
   dataset_id = google_bigquery_dataset.sih_raw.dataset_id
-  table_id   = "SP24"
+  table_id   = "internacoes"
   
   external_data_configuration {
     autodetect    = true
     source_format = "PARQUET"
-    source_uris   = ["gs://${google_storage_bucket.raw_data.name}/*.parquet"]
+    source_uris   = ["gs://${google_storage_bucket.raw_data.name}/year=*/state=*/*.parquet"]
+    
+    hive_partitioning_options {
+      mode                     = "AUTO"
+      source_uri_prefix        = "gs://${google_storage_bucket.raw_data.name}/"
+      require_partition_filter = false
+    }
   }
-  
+
   deletion_protection = false
 }

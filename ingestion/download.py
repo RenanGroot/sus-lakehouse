@@ -7,6 +7,8 @@ import os
 import logging
 from google.cloud import storage
 from dotenv import load_dotenv
+from datetime import datetime
+import re
 
 load_dotenv()
 
@@ -15,11 +17,40 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
+# Global Variables
 RAW_PATH = Path("/tmp/raw")
 BUCKET_NAME = os.getenv("BUCKET_NAME")
 FTP_HOST = "ftp.datasus.gov.br"
 FTP_PATH = "dissemin/publicos/SIHSUS/200801_/Dados/"
-FILE_FILTER = "RDSP24" # RD table, SP state, year 2024
+RD_PATTERN = re.compile(r"^RD[A-Z]{2}\d{4}\.dbc$", re.IGNORECASE)
+MIN_YEAR = int(os.getenv("MIN_YEAR", "2025"))
+
+
+# Functions
+def extract_year_state(filename: str) -> tuple[str, str]:
+    """
+    Extracts the state and converts the 2-digit year to a 4-digit format from a filename.
+
+    The filename must follow the strict pattern 'RD{STATE}{YY}{MM}.dbc', where
+    STATE is a 2-letter code, YY is a 2-digit year, and MM is a 2-digit month.
+
+    Args:
+        filename: The name of the file to parse (e.g., 'RDNY2612.dbc').
+
+    Returns:
+        A tuple containing:
+            - state (str): The 2-letter state abbreviation (e.g., 'NY').
+            - yyyy (int): The 4-digit converted year (e.g., 2026).
+    """
+    pattern = r"^RD([A-Za-z]{2})(\d{2})(\d{2})\.dbc$"
+    match = re.match(pattern, filename, re.IGNORECASE)
+    state = match.group(1)
+    yy = match.group(2)
+    month = match.group(3)
+
+    # Convert 2-digit year (YY) to 4-digit year (YYYY)
+    yyyy = str(datetime.strptime(yy, "%y").year)
+    return state, yyyy
 
 
 def download_to_gcs(bucket_name: str) -> None:
@@ -43,12 +74,22 @@ def download_to_gcs(bucket_name: str) -> None:
     
     files = []
     ftp.retrlines("LIST", files.append)
-    rd_files = [f.split()[-1] for f in files if FILE_FILTER in f]
+    rd_files = []
+    for line in files:
+        filename = line.split()[-1]
+        if not RD_PATTERN.match(filename):
+            continue
+        _, year = extract_year_state(filename)
+        if int(year) < MIN_YEAR:
+            continue
+        rd_files.append(filename)
+
     logging.info(f"Found {len(rd_files)} files to process")
     
     for file in rd_files:
         file_stem = file.replace(".dbc", "")
-        blob_name = f"{file_stem}.parquet"
+        state, year = extract_year_state(file)
+        blob_name = f"year={year}/state={state}/{file_stem}.parquet"
         blob = bucket.blob(blob_name)
         
         if blob.exists():
@@ -56,7 +97,7 @@ def download_to_gcs(bucket_name: str) -> None:
             continue
         
         local_dbc = RAW_PATH / file
-        local_parquet = RAW_PATH / blob_name
+        local_parquet = RAW_PATH / f"{file_stem}.parquet"
         
         try:
             logging.info(f"Downloading {file} from FTP")
@@ -77,6 +118,6 @@ def download_to_gcs(bucket_name: str) -> None:
     ftp.quit()
     logging.info("All files processed")
 
-
+# Main
 if __name__ == "__main__":
     download_to_gcs(BUCKET_NAME)
