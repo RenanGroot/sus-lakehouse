@@ -89,7 +89,7 @@ def download_to_gcs(bucket_name: str) -> None:
     for file in rd_files:
         file_stem = file.replace(".dbc", "")
         state, year = extract_year_state(file)
-        blob_name = f"year={year}/state={state}/{file_stem}.parquet"
+        blob_name = f"sih/year={year}/state={state}/{file_stem}.parquet"
         blob = bucket.blob(blob_name)
         
         if blob.exists():

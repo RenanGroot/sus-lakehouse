@@ -143,14 +143,87 @@ resource "google_bigquery_table" "internacoes" {
   external_data_configuration {
     autodetect    = true
     source_format = "PARQUET"
-    source_uris   = ["gs://${google_storage_bucket.raw_data.name}/year=*/state=*/*.parquet"]
+    source_uris   = ["gs://${google_storage_bucket.raw_data.name}/sih/*.parquet"]
     
     hive_partitioning_options {
       mode                     = "AUTO"
-      source_uri_prefix        = "gs://${google_storage_bucket.raw_data.name}/"
+      source_uri_prefix        = "gs://${google_storage_bucket.raw_data.name}/sih"
       require_partition_filter = false
     }
   }
 
+  deletion_protection = false
+}
+
+# Cloud Run Job for reference data ingestion (IBGE APIs)
+resource "google_cloud_run_v2_job" "reference_ingestion" {
+  name     = "sus-lakehouse-reference-ingestion"
+  location = var.region
+  
+  template {
+    template {
+      service_account = google_service_account.ingestion_runner.email
+      timeout         = "600s"
+      
+      containers {
+        image = "${var.region}-docker.pkg.dev/${var.project_id}/sus-lakehouse/reference-ingestion:latest"
+        
+        resources {
+          limits = {
+            cpu    = "1"
+            memory = "1Gi"
+          }
+        }
+        
+        env {
+          name  = "BUCKET_NAME"
+          value = var.bucket_name
+        }
+      }
+    }
+  }
+}
+
+# Cloud Scheduler — triggers reference ingestion monthly
+resource "google_cloud_scheduler_job" "reference_ingestion_monthly" {
+  name        = "sus-lakehouse-reference-ingestion-monthly"
+  region      = var.region
+  schedule    = "0 8 1 * *"
+  description = "Refresh IBGE population and IPCA reference data monthly"
+  
+  http_target {
+    http_method = "POST"
+    uri         = "https://${var.region}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${var.project_id}/jobs/${google_cloud_run_v2_job.reference_ingestion.name}:run"
+    
+    oauth_token {
+      service_account_email = google_service_account.ingestion_runner.email
+    }
+  }
+}
+
+# BigQuery external tables for reference data
+resource "google_bigquery_table" "population" {
+  dataset_id = google_bigquery_dataset.sih_raw.dataset_id
+  table_id   = "state_population"
+  
+  external_data_configuration {
+    autodetect    = true
+    source_format = "PARQUET"
+    source_uris   = ["gs://${google_storage_bucket.raw_data.name}/reference/population/*.parquet"]
+  }
+  
+  deletion_protection = false
+}
+
+resource "google_bigquery_table" "ipca" {
+  dataset_id = google_bigquery_dataset.sih_raw.dataset_id
+  table_id   = "ipca_monthly"
+  
+  external_data_configuration {
+    autodetect    = true
+    source_format = "PARQUET"
+    source_uris   = ["gs://${google_storage_bucket.raw_data.name}/reference/ipca/*.parquet"]
+  }
+  
   deletion_protection = false
 }
