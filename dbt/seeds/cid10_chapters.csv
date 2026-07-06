@@ -21,3 +21,4 @@ XIX,S00,T98,"Injury, poisoning and external causes"
 XX,V01,Y98,External causes of morbidity and mortality
 XXI,Z00,Z99,Factors influencing health status
 XXII,U00,U85,Codes for special purposes
+XXIII,U86,U99,Special purposes (Brazilian extensions)
