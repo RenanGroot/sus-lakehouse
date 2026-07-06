@@ -35,7 +35,27 @@ models:
       description: "CID-10 Chapter's description"
       data_tests:
         - not_null
-    - name: sum_totalval
+    - name: sum_total_cost_corrected
       description:  "Sum of total costs"
       data_tests:
         - positive_values
+  - name: mart_hospitalizations_by_state
+    description: "Mart model for hospitalizations by state and year"
+    columns:
+    - name: total_hospitalizations
+      description: "Total hospitalizations by state and year"
+      data_tests:
+        - not_null
+        - strictly_positive
+    - name: hospitalizations_per_100k
+      description: "Total hospitalizations by state and year per 100k habitants"
+      data_tests:
+        - not_null
+        - strictly_positive
+  - name: mart_monthly_trend
+    description: "Monthly hospitalization metrics by state for time series analysis"
+    columns:
+      - name: total_hospitalizations
+        tests:
+          - not_null
+          - strictly_positive
