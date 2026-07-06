@@ -3,7 +3,6 @@ sources:
     description:  |
       Raw SIH/RD hospitalization data from DATASUS (Brazilian Ministry of Health).
       Files are downloaded from the DATASUS FTP server and stored as parquet in GCS.
-      Currently covers São Paulo state for 2024.
     schema: sih_raw
     tables:
       - name: internacoes
@@ -11,6 +10,10 @@ sources:
           Hospitalization records partitioned by year and state. The Hive partition columns
           'year' and 'state' are automatically exposed by BigQuery from the GCS folder structure
           and are queryable as regular columns despite not being stored in the parquet files.
+      - name: state_population
+        description:  "Yearly population estimates by state from IBGE API (table 6579)"
+      - name: ipca_monthly
+        description:  "Monthly IPCA index (accumulated since Dec 1993) from IBGE SIDRA (table 1737, variable 2266)"
 models:
   - name: stg_sih_rd
     description: "Staging model for SIH/RD data, with type casting and column standardization."
@@ -26,4 +29,31 @@ models:
             arguments:
               values: [0,1]
               quote: false
-      
+  - name: stg_state_population
+    columns:
+    - name: state
+      data_tests:
+        - not_null
+    - name: year
+      data_tests:
+        - not_null
+    - name: population
+      data_tests:
+        - not_null
+        - strictly_positive
+  - name: stg_ipca_monthly
+    columns:
+    - name: month
+      data_tests:
+        - accepted_values:
+            arguments:
+              values: [1,2,3,4,5,6,7,8,9,10,11,12]
+              quote:  false
+        - not_null
+    - name: year
+      data_tests:
+        - not_null
+    - name: ipca_index
+      data_tests:
+        - not_null
+        - strictly_positive

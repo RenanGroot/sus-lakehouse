@@ -11,5 +11,7 @@ SELECT
     CAST(MORTE AS INT64) AS morte,
     CAST(IDADE AS INT64) AS idade,
     SEXO as sexo,
-    MUNIC_RES as munic_res
+    MUNIC_RES as munic_res,
+    CAST(SUBSTR(DT_INTER, 1, 4) AS INT64) AS admission_year,
+    CAST(SUBSTR(DT_INTER, 5, 2) AS INT64) AS admission_month
 FROM stg_sih_rd
