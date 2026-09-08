@@ -10,6 +10,18 @@ models:
       description: "CID-10 Chapter's description"
       data_tests:
         - not_null
+    - name: state
+      description: "Brazilian State name abbreviation, based in the two-letter official abbreviation"
+      data_tests:
+        - not_null
+        - accepted_values:
+            arguments:
+              values: ["AC","AL","AP","AM","BA","CE","GO","ES","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SP","SC","SE","TO","DF"]
+    - name: admission_year
+      description: "Four-digit calendar year corresponding to the patient's hospital admission date recorded on the Hospital Inpatient Authorization (AIH)"
+      data_tests:
+        - not_null
+        - strictly_positive
   - name: mart_mortality_rate
     description: "Mart model for aggregated data about mortality rate for admissions"
     columns:
@@ -23,6 +35,18 @@ models:
         - not_null
     - name: count_cases
       data_tests:
+        - strictly_positive
+    - name: state
+      description: "Brazilian State name abbreviation, based in the two-letter official abbreviation"
+      data_tests:
+        - not_null
+        - accepted_values:
+            arguments:
+              values: ["AC","AL","AP","AM","BA","CE","GO","ES","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SP","SC","SE","TO","DF"]
+    - name: admission_year
+      description: "Four-digit calendar year corresponding to the patient's hospital admission date recorded on the Hospital Inpatient Authorization (AIH)"
+      data_tests:
+        - not_null
         - strictly_positive
   - name: mart_total_cost
     description: "Mart model for aggregated data about costs for admissions"
@@ -39,6 +63,18 @@ models:
       description:  "Sum of total costs"
       data_tests:
         - positive_values
+    - name: state
+      description: "Brazilian State name abbreviation, based in the two-letter official abbreviation"
+      data_tests:
+        - not_null
+        - accepted_values:
+            arguments:
+              values: ["AC","AL","AP","AM","BA","CE","GO","ES","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SP","SC","SE","TO","DF"]
+    - name: admission_year
+      description: "Four-digit calendar year corresponding to the patient's hospital admission date recorded on the Hospital Inpatient Authorization (AIH)"
+      data_tests:
+        - not_null
+        - strictly_positive
   - name: mart_hospitalizations_by_state
     description: "Mart model for hospitalizations by state and year"
     columns:
@@ -52,10 +88,34 @@ models:
       data_tests:
         - not_null
         - strictly_positive
+    - name: state
+      description: "Brazilian State name abbreviation, based in the two-letter official abbreviation"
+      data_tests:
+        - not_null
+        - accepted_values:
+            arguments:
+              values: ["AC","AL","AP","AM","BA","CE","GO","ES","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SP","SC","SE","TO","DF"]
+    - name: admission_year
+      description: "Four-digit calendar year corresponding to the patient's hospital admission date recorded on the Hospital Inpatient Authorization (AIH)"
+      data_tests:
+        - not_null
+        - strictly_positive
   - name: mart_monthly_trend
     description: "Monthly hospitalization metrics by state for time series analysis"
     columns:
       - name: total_hospitalizations
-        tests:
+        data_tests:
+          - not_null
+          - strictly_positive
+      - name: state
+        description: "Brazilian State name abbreviation, based in the two-letter official abbreviation"
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["AC","AL","AP","AM","BA","CE","GO","ES","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SP","SC","SE","TO","DF"]
+      - name: admission_year
+        description: "Four-digit calendar year corresponding to the patient's hospital admission date recorded on the Hospital Inpatient Authorization (AIH)"
+        data_tests:
           - not_null
           - strictly_positive
