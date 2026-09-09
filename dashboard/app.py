@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from google.cloud import bigquery
-
+import json
+from pathlib import Path
 
 # Steamlit
 st.set_page_config(page_title="SUS Lakehouse", layout="wide")
@@ -26,6 +27,12 @@ def load_data() -> dict:
         marts[mart] = client.query(query).to_dataframe()
     return marts
 
+@st.cache_data
+def load_geojson() -> dict:
+    """Load Brazilian state boundaries GeoJSON from disk."""
+    path = Path(__file__).parent / "data" / "brasil_estados.geojson"
+    with open(path) as f:
+        return json.load(f)
 
 # Chart Functions
 def chart_avg_length_of_stay(df: pd.DataFrame, min_year_filter: int, max_year_filter: int) -> None:
@@ -125,7 +132,7 @@ def chart_timeseries(df: pd.DataFrame, min_year_filter: int, max_year_filter: in
         metric: Selected metric
         granularity: Year or Month
         comparision: If it is a comparision chart (True)
-        selected_states: List of pre-selected states
+        selected_states: List of pre-selected states used to filter the chart
     
     Returns:
         None
@@ -164,9 +171,37 @@ def chart_timeseries(df: pd.DataFrame, min_year_filter: int, max_year_filter: in
     )
     st.plotly_chart(fig)
 
+def chart_hospitalizations_map(df: pd.DataFrame, selected_year: int, geojson_data:dict) -> None:
+    """
+    Creates a Choropleth map, showing the hospitalization rate (hospitalizations per 100k inhabitants) 
+    for each Brazilian State, accordingly to the selected year.
+
+    Args:
+        df: Datasource as a DataFrame
+        selected_year: Selected year used to filter the map
+        geojson_data: GEOJSON with Brazilian States poligons coordinates
+    
+    Returns:
+        None
+    """
+    df_filtered = df[df["admission_year"]== selected_year]
+    fig = px.choropleth(
+    df_filtered,
+    geojson=geojson_data,
+    locations="state",
+    featureidkey="properties.sigla",
+    color="hospitalizations_per_100k",
+    #scope="south america",          
+    title=f"Hospitalizations per 100k inhabitants, {selected_year}",
+)
+    fig.update_geos(fitbounds="locations", visible=False) 
+    fig.update_layout(height=600, margin={"r": 0, "l": 0, "t": 40, "b": 0})
+    st.plotly_chart(fig, use_container_width=True)
+
 #Main
 
 df = load_data()
+geojson_states = load_geojson()
 
 year_min = int(df["mart_monthly_trend"]["admission_year"].min())
 year_max = int(df["mart_monthly_trend"]["admission_year"].max())
@@ -197,5 +232,16 @@ chart_timeseries(
     metric= metric_selection,
     granularity=granularity_selection,
     comparision=comparision_selection,
-    selected_states=selected_states,
+    selected_states=selected_states
 )
+st.header("Geographic distribution")
+c_widget, c_chart = st.columns([1, 4])
+with c_widget:
+    year_map = st.slider("Year",
+                min_value = 2025,
+                max_value = year_max,
+                value = year_max)
+with c_chart:
+    chart_hospitalizations_map(df["mart_hospitalizations_by_state"],
+                selected_year=year_map,
+                geojson_data=geojson_states)
