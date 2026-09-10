@@ -15,3 +15,4 @@ terraform/.terraform/
 terraform/terraform.tfvars
 terraform/*.tfstate*
 .python-version
+!dashboard/data/
