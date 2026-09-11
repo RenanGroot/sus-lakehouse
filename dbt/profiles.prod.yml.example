@@ -1,0 +1,10 @@
+sus_lakehouse:
+  outputs:
+    prod:
+      type: bigquery
+      method: oauth
+      project: your-project-id
+      dataset: sih_raw
+      location: southamerica-east1
+      threads: 4
+  target: prod

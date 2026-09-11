@@ -91,7 +91,7 @@ resource "google_cloud_scheduler_job" "ingestion_monthly" {
   name        = "sus-lakehouse-ingestion-monthly"
   region      = var.region
   schedule    = "0 10 1 * *"
-  description = "Run ingestion on the 1st of every month at 6 AM"
+  description = "Run ingestion on the 1st of every month at 10 AM"
   
   http_target {
     http_method = "POST"
@@ -226,4 +226,84 @@ resource "google_bigquery_table" "ipca" {
   }
   
   deletion_protection = false
+}
+
+# Dbt runner service account
+resource "google_service_account" "dbt_runner" {
+  account_id   = "dbt-runner"
+  display_name = "DBT Cloud Run Job service account"
+}
+
+resource "google_project_iam_member" "dbt_bg_user" {
+  project = var.project_id
+  role    = "roles/bigquery.jobUser"
+  member  = "serviceAccount:${google_service_account.dbt_runner.email}"
+}
+
+resource "google_project_iam_member" "dbt_bg_editor" {
+  project = var.project_id
+  role    = "roles/bigquery.dataEditor"
+  member  = "serviceAccount:${google_service_account.dbt_runner.email}"
+}
+
+# Dbt bucket reader
+resource "google_storage_bucket_iam_member" "dbt_bucket_reader" {
+  bucket = google_storage_bucket.raw_data.name 
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${google_service_account.dbt_runner.email}"
+}
+
+# Dbt invoker service account
+resource "google_service_account" "dbt_invoker" {
+  account_id   = "dbt-invoker"
+  display_name = "DBT invoker service account"
+}
+
+resource "google_cloud_run_v2_job_iam_member" "dbt_invoker_binding" {
+  location = google_cloud_run_v2_job.dbt.location
+  name     = google_cloud_run_v2_job.dbt.name
+  role    = "roles/run.invoker"
+  member  = "serviceAccount:${google_service_account.dbt_invoker.email}"
+}
+
+# Cloud Run Job for dbt
+resource "google_cloud_run_v2_job" "dbt" {
+  name     = "sus-lakehouse-dbt"
+  location = var.region
+  
+  template {
+    template {
+      service_account = google_service_account.dbt_runner.email
+      timeout         = "1800s"
+      
+      containers {
+        image = "${var.region}-docker.pkg.dev/${var.project_id}/sus-lakehouse/dbt:latest"
+        
+        resources {
+          limits = {
+            cpu    = "1"
+            memory = "2Gi"
+          }
+        }
+
+      }
+    }
+  }
+}
+
+# Cloud Scheduler — triggers dbt monthly
+resource "google_cloud_scheduler_job" "dbt_monthly" {
+  name        = "sus-lakehouse-dbt-monthly"
+  region      = var.region
+  schedule    = "0 14 1 * *"
+  description = "Run dbt transformations on the 1st of every month at 2 PM"
+  
+  http_target {
+    http_method = "POST"
+    uri         = "https://${var.region}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${var.project_id}/jobs/${google_cloud_run_v2_job.dbt.name}:run"
+    
+    oauth_token {
+      service_account_email = google_service_account.dbt_invoker.email
+    }
+  }
 }
