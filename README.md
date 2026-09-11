@@ -4,62 +4,82 @@ A cloud-native data engineering project that ingests Brazilian public hospitaliz
 
 **Live demo:** https://sus-lakehouse-dashboard-889170445714.southamerica-east1.run.app/
 
+## Dashboard
+
+The dashboard is organized in three sections:
+
+### By diagnosis
+Top diagnoses across three metrics: average length of stay, total inflation-adjusted cost, and mortality rate. Each chart has its own year filter, plus a per-chart minimum-cases threshold for the mortality rate.
+
 <p align="center">
-  <img src="docs/dashboard.png" width="48%" alt="Dashboard overview">
-  <img src="docs/dashboard_filtered.png" width="48%" alt="Dashboard with filter applied">
+  <img src="docs/dashboard_diagnosis.png" alt="Diagnosis charts">
+</p>
+
+### Trends over time
+Selectable metric (hospitalizations, deaths, cost, mortality rate) and granularity (year/month), with a toggle to overlay states as separate lines. The pre-2024 flatness in the chart above reflects the admission-date-vs-processing-date effect described under Known limitations — most historical records in the current data are edge-case long-stay cases.
+
+<p align="center">
+  <img src="docs/dashboard_trends.png" alt="Trends over time">
+</p>
+
+### Geographic distribution
+Hospitalizations per 100k inhabitants by state, for a selected year. Population comes from IBGE and is joined in the dbt intermediate model so the rate is comparable across states.
+
+<p align="center">
+  <img src="docs/dashboard_map.png" alt="Brazil choropleth">
 </p>
 
 ## Architecture
 
 ```
-                    ┌──────────────────┐
-                    │ Cloud Scheduler  │
-                    │   (monthly x2)   │
-                    └────┬─────────┬───┘
-                         │         │
-       ┌─────────────────┘         └──────────────────┐
-       ▼                                              ▼
-┌──────────────┐                              ┌──────────────┐
-│   DATASUS    │                              │  IBGE SIDRA  │
-│   FTP server │                              │      API     │
-└──────┬───────┘                              └──────┬───────┘
-       │                                             │
-       ▼                                             ▼
-┌──────────────────┐                          ┌──────────────────┐
-│  Cloud Run Job   │                          │  Cloud Run Job   │
-│  (SIH ingestion) │                          │ (reference data) │
-└──────┬───────────┘                          └──────┬───────────┘
-       │                                             │
-       └─────────────────────┬───────────────────────┘
-                             ▼
-                     ┌──────────────┐
-                     │  GCS Bucket  │
-                     │  (raw data)  │
-                     └──────┬───────┘
-                            │
-                            ▼
-                ┌────────────────────────┐
-                │   BigQuery dataset     │
-                │  ┌──────────────────┐  │
-                │  │ External tables  │  │
-                │  │  - internacoes   │  │
-                │  │  - population    │  │
-                │  │  - ipca_monthly  │  │
-                │  └────────┬─────────┘  │
-                │           │            │
-                │           ▼            │
-                │   dbt transformations  │
-                │  staging → int → mart  │
-                └────────────┬───────────┘
-                             │
-                             ▼
-                ┌────────────────────────┐
-                │  Cloud Run Service     │
-                │  (Streamlit dashboard) │
-                └────────────┬───────────┘
-                             │
-                             ▼
-                       [public URL]
+                       ┌──────────────────┐
+                       │ Cloud Scheduler  │
+                       │   (monthly x3)   │
+                       └──┬───────┬──────┬┘
+                          │       │      │
+       ┌──────────────────┘       │      └─────────────────────┐
+       ▼                          ▼                            ▼
+┌──────────────┐          ┌──────────────┐            ┌────────────────┐
+│   DATASUS    │          │  IBGE SIDRA  │            │   (delayed:    │
+│   FTP server │          │      API     │            │  runs after    │
+└──────┬───────┘          └──────┬───────┘            │  ingestion)    │
+       │                         │                    └────────┬───────┘
+       ▼                         ▼                             │
+┌──────────────────┐      ┌──────────────────┐                 │
+│  Cloud Run Job   │      │  Cloud Run Job   │                 │
+│  (SIH ingestion) │      │ (reference data) │                 │
+└──────┬───────────┘      └──────┬───────────┘                 │
+       │                         │                             │
+       └──────────┬──────────────┘                             │
+                  ▼                                            │
+          ┌──────────────┐                                     │
+          │  GCS Bucket  │                                     │
+          │  (raw data)  │                                     │
+          └──────┬───────┘                                     │
+                 │                                             │
+                 ▼                                             │
+     ┌────────────────────────┐                                │
+     │   BigQuery dataset     │◄───────────┐                   │
+     │  ┌──────────────────┐  │            │                   │
+     │  │ External tables  │  │            │                   │
+     │  │  - internacoes   │  │       ┌────┴────────────┐      │
+     │  │  - population    │  │       │  Cloud Run Job  │◄─────┘
+     │  │  - ipca_monthly  │  │       │      (dbt)      │
+     │  └────────┬─────────┘  │       └─────────────────┘
+     │           │            │
+     │           ▼            │
+     │  dbt-materialized      │
+     │  staging → int → mart  │
+     └────────────┬───────────┘
+                  │
+                  ▼
+     ┌────────────────────────┐
+     │  Cloud Run Service     │
+     │  (Streamlit dashboard) │
+     └────────────┬───────────┘
+                  │
+                  ▼
+            [public URL]
 ```
 
 All infrastructure defined as code in `terraform/`.
@@ -145,6 +165,11 @@ Added a second Cloud Run Job that pulls state population estimates and monthly I
 
 **Tools added:** IBGE SIDRA API, second Cloud Run Job pipeline
 
+### Phase 7 — dbt automation and dashboard expansion
+Packaged the dbt project into a Docker image with `method: oauth` authentication (no keyfile needed inside the container — Cloud Run's attached service account is picked up automatically) and deployed it as a third Cloud Run Job triggered by its own Cloud Scheduler. dbt now runs `dbt run && dbt test` monthly, a few hours after ingestion completes. On the dashboard side, added a timeseries chart (selectable metric, granularity, and state-comparison mode) and a Brazil choropleth map showing hospitalizations per 100k inhabitants by state.
+
+**Tools added:** Dedicated dbt Docker image, third Cloud Run Job pipeline, Plotly choropleth
+
 ## Setup
 
 ### Prerequisites
@@ -191,7 +216,7 @@ terraform init
 terraform apply
 ```
 
-This creates: GCS bucket, BigQuery dataset and external tables, Artifact Registry repository, service accounts with least-privilege roles, two Cloud Run Jobs (SIH ingestion and reference data ingestion), Cloud Scheduler triggers for both, and the dashboard Cloud Run service.
+This creates: GCS bucket, BigQuery dataset and external tables, Artifact Registry repository, service accounts with least-privilege roles, three Cloud Run Jobs (SIH ingestion, reference data ingestion, dbt transformations), Cloud Scheduler triggers for all three, and the dashboard Cloud Run service.
 
 ### 5. Build and push Docker images
 
@@ -207,6 +232,10 @@ docker push southamerica-east1-docker.pkg.dev/YOUR-PROJECT-ID/sus-lakehouse/inge
 # Reference data ingestion job
 docker build -t southamerica-east1-docker.pkg.dev/YOUR-PROJECT-ID/sus-lakehouse/reference-ingestion:latest ingestion-reference/
 docker push southamerica-east1-docker.pkg.dev/YOUR-PROJECT-ID/sus-lakehouse/reference-ingestion:latest
+
+# dbt transformations job
+docker build -t southamerica-east1-docker.pkg.dev/YOUR-PROJECT-ID/sus-lakehouse/dbt:latest dbt/
+docker push southamerica-east1-docker.pkg.dev/YOUR-PROJECT-ID/sus-lakehouse/dbt:latest
 ```
 
 ### 6. Deploy Cloud Run services
@@ -237,22 +266,23 @@ cp dbt/profiles.yml.example dbt/profiles.yml
 
 Once deployed, the pipeline runs automatically:
 
-- **Monthly (SIH)** — Cloud Scheduler triggers the SIH ingestion job on the 1st of each month. The job downloads new files from DATASUS FTP, converts `.dbc` → `.parquet`, and uploads them to GCS (skipping files already present).
-- **Monthly (Reference data)** — A second Cloud Scheduler triggers the reference data ingestion job on the same cadence. It fetches state population and IPCA index from the IBGE SIDRA API and writes them as parquet to GCS.
-- **BigQuery** reads both raw datasets directly via external tables — no copy needed.
-- **dbt** (run manually for now) transforms the raw data through staging → intermediate → marts, applying inflation adjustments and population normalization along the way.
-- **The Streamlit dashboard** reads the marts and renders the five charts.
+- **Monthly (SIH ingestion)** — Cloud Scheduler triggers the SIH ingestion job on the 1st of each month. The job downloads new files from DATASUS FTP, converts `.dbc` → `.parquet`, and uploads them to GCS (skipping files already present).
+- **Monthly (Reference data ingestion)** — A second Cloud Scheduler triggers the reference data ingestion job on the same day. It fetches state population and IPCA index from the IBGE SIDRA API and writes them as parquet to GCS.
+- **Monthly (dbt)** — A third Cloud Scheduler triggers the dbt Cloud Run Job on the same day, a few hours after ingestion. dbt reads the external tables, runs `dbt run && dbt test`, and rebuilds the marts. No orchestration engine — just staggered cron times, which is enough for monthly batch.
+- **BigQuery** reads the raw datasets directly via external tables — no copy needed.
+- **The Streamlit dashboard** reads the rebuilt marts and renders the five charts.
 
 ### Manual operations
 
-Trigger ingestion on demand:
+Trigger any of the jobs on demand:
 
 ```bash
 gcloud run jobs execute sus-lakehouse-ingestion --region=southamerica-east1
 gcloud run jobs execute sus-lakehouse-reference-ingestion --region=southamerica-east1
+gcloud run jobs execute sus-lakehouse-dbt --region=southamerica-east1
 ```
 
-Run dbt transformations:
+Run dbt locally (for iterating on models):
 
 ```bash
 cd dbt && dbt run --target local
@@ -267,7 +297,7 @@ docker push southamerica-east1-docker.pkg.dev/YOUR-PROJECT-ID/sus-lakehouse/stre
 gcloud run deploy sus-lakehouse-dashboard --image=southamerica-east1-docker.pkg.dev/YOUR-PROJECT-ID/sus-lakehouse/streamlit:latest --region=southamerica-east1
 ```
 
-Most of these have shortcuts in the `Makefile`.
+
 
 ## Project structure
 
@@ -288,7 +318,10 @@ sus-lakehouse/
 │   │   └── mart/            # Final aggregated tables for dashboard
 │   ├── seeds/               # Reference data (CID-10 chapters)
 │   ├── tests/generic/       # Custom data quality tests
-│   └── dbt_project.yml
+│   ├── dbt_project.yml
+│   ├── profiles.prod.yml    # Profile used inside the Cloud Run Job (method: oauth)
+│   ├── Dockerfile           # Packages dbt + project for Cloud Run Job execution
+│   └── .dockerignore
 ├── ingestion/               # Cloud Run Job for SIH ingestion
 │   ├── download.py          # FTP → GCS pipeline
 │   ├── Dockerfile
@@ -306,7 +339,6 @@ sus-lakehouse/
 │   ├── dashboard.png
 │   ├── dashboard_filtered.png
 │   └── dic.pdf              # SIH/RD data dictionary
-├── Makefile                 # Common command shortcuts
 ├── pyproject.toml           # Python dependencies (local dev)
 ├── uv.lock                  # Lockfile
 └── README.md
@@ -334,15 +366,13 @@ The project initially used Apache Airflow (local Docker) for orchestration and e
 
 Each cloud service has its own service account with the minimum permissions required: `ingestion-runner` can only write to GCS, `streamlit-runner` can only read BigQuery, and so on. This limits blast radius if any service is compromised. Service account keys are never used in production — Cloud Run authenticates services via attached identities and Application Default Credentials.
 
-### Manual dbt invocation
+### Independent schedulers instead of dependency-aware orchestration
 
-dbt currently runs manually rather than on a schedule. The full automation (Cloud Scheduler triggers ingestion → triggers a third Cloud Run Job that runs dbt) would be a natural next step but adds operational complexity that isn't justified for monthly data. For now, contributors run `make dbt-run` after ingestion completes.
+The three Cloud Run Jobs (SIH ingestion, reference ingestion, dbt) run on independent Cloud Scheduler triggers spaced a few hours apart, rather than being chained through Cloud Workflows or similar. This is deliberately simpler than "dbt runs when ingestion succeeds": for monthly batch on a well-understood dataset, staggered cron times are enough, and adding a workflow engine would introduce another moving part to monitor. The trade-off is that if ingestion takes longer than expected (say, DATASUS is slow), dbt could run against stale data — recoverable by manually re-triggering dbt, but not automatic. Cloud Workflows is listed under Future improvements for when this becomes a real problem.
 
 ## Known limitations
 
 - **Admission date vs. processing date semantics** — The ingestion pulls SIH files from 2025 onwards, since SIH files are organized by processing/billing month rather than by admission date. Some records within those files reference admissions from prior years — typically long-stay hospitalizations or reprocessed cases. As a result, `admission_year` values before 2025 exist in the data but represent a biased subset (long-stay patients are overrepresented) and should not be interpreted as full-year cohorts.
-
-- **Manual dbt execution** — Transformations run on-demand, not on a schedule. After ingestion completes, `make dbt-run` must be executed manually.
 
 - **No incremental loading** — dbt models materialize fully on every run rather than incrementally. Fine for current data volume; would need adjustment as the historical backfill grows.
 
@@ -356,14 +386,14 @@ dbt currently runs manually rather than on a schedule. The full automation (Clou
 
 - **Historical backfill** — Extend the ingestion to also pull SIH files from years before 2025 (currently the filter starts at 2025 processing months). This would give complete admission-year cohorts for retrospective analysis, at the cost of additional storage and dbt processing time.
 
-- **Schedule dbt with the ingestion jobs** — Add a third Cloud Run Job for dbt and chain them via Cloud Workflows so the full pipeline runs end-to-end without human involvement.
+- **Chain ingestion → dbt via Cloud Workflows** — Replace the "staggered cron times" approach with dependency-aware orchestration so dbt only runs after ingestion succeeds, and failures propagate cleanly rather than causing dbt to run against stale data.
 
 - **CI/CD with GitHub Actions** — On push to `main`, automatically build and push Docker images, then trigger `gcloud run deploy`. The dashboard updates within minutes of any code change.
 
 - **Incremental dbt models** — Switch high-volume marts to `materialized='incremental'` so dbt only processes new data each month instead of full rebuilds.
 
-- **Choropleth map of hospitalizations by state** — Add a Brazil choropleth to the dashboard using the `mart_hospitalizations_by_state` per-100k metric.
-
 - **More dashboard insights** — Demographic breakdowns (age, sex, race), procedure-level analysis, and drill-downs by state or diagnosis chapter.
+
+- **`Makefile` for common commands** — One-command shortcuts for `deploy-dashboard`, `deploy-dbt`, `deploy-ingestion` so contributors don't need to remember multi-step `docker build/push/deploy` chains.
 
 - **Custom domain for the dashboard** — Map a friendly URL via Cloud DNS instead of the auto-generated `*.run.app`.
