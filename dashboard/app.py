@@ -37,7 +37,7 @@ def load_geojson() -> dict:
 # Chart Functions
 def chart_avg_length_of_stay(df: pd.DataFrame, min_year_filter: int, max_year_filter: int) -> None:
     """
-    Creates a Bar Chart with the average length of stay by the CID-10 diseases
+    Creates a Bar Chart with the average length of stay by the ICD-10 diseases
       through querying the data frame.
     
     Args:
@@ -57,15 +57,16 @@ def chart_avg_length_of_stay(df: pd.DataFrame, min_year_filter: int, max_year_fi
         hover_data=["description"],
         title="Average Days by Diagnosis",
         labels={
-            "diag_princ": "Diagnosis (CID-10)",
-            "avg_days": "Average Length of Stay (days)"
+            "diag_princ": "Diagnosis (ICD-10)",
+            "avg_days": "Average Length of Stay (days)",
+            "description": "Diagnosis name"
         }
     )
     st.plotly_chart(fig)
 
 def chart_total_cost(df: pd.DataFrame, min_year_filter: int, max_year_filter: int) -> None:
     """
-    Creates a Bar Chart with the total costs by the CID-10 diseases
+    Creates a Bar Chart with the total costs by the ICD-10 diseases
       through querying the data frame.
     
     Args:
@@ -85,15 +86,16 @@ def chart_total_cost(df: pd.DataFrame, min_year_filter: int, max_year_filter: in
         hover_data=["description"],
         title="Total Cost Value by Diagnosis",
         labels={
-            "diag_princ": "Diagnosis (CID-10)",
-            "sum_total_cost_corrected": "Total Cost Value (reais)"
+            "diag_princ": "Diagnosis (ICD-10)",
+            "sum_total_cost_corrected": "Total Cost Value (reais)",
+            "description": "Diagnosis name"
         }
     )
     st.plotly_chart(fig)
 
 def chart_mortality_rate(df: pd.DataFrame, min_year_filter: int, max_year_filter: int, min_cases: int) -> None:
     """
-    Creates a Bar Chart with the mortality rate by the CID-10 diseases 
+    Creates a Bar Chart with the mortality rate by the ICD-10 diseases 
     given a minimum threshold for the cases.
     
     Args:
@@ -114,8 +116,9 @@ def chart_mortality_rate(df: pd.DataFrame, min_year_filter: int, max_year_filter
         hover_data=["description"],
         title="Mortality Rate by Diagnosis (%)",
         labels={
-            "diag_princ": "Diagnosis (CID-10)",
-            "avg_morte": "Mortality Rate"
+            "diag_princ": "Diagnosis (ICD-10)",
+            "avg_morte": "Mortality Rate",
+            "description": "Diagnosis name"
         }
     )
     st.plotly_chart(fig)
