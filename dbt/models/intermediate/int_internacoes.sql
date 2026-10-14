@@ -2,7 +2,7 @@ WITH stg_sih_rd AS (
     SELECT * FROM {{ ref('stg_sih_rd') }}
 ),
 icd10 AS(
-    SELECT * FROM {{ref('icd10')}}
+    SELECT * FROM {{ref('cid10')}}
 ),
 pop AS(
     SELECT * FROM {{ref('stg_state_population')}}
@@ -41,7 +41,9 @@ SELECT
         WHEN s.dias_perm BETWEEN 3 AND 10  THEN "medium"
         ELSE "long"
     END as length_category,
-    c.description,
+    COALESCE(c.description, 'Código ' || s.diag_princ || ' (não catalogado)') AS description,
+    COALESCE(c.chapter, 'N/A') AS chapter,
+    COALESCE(c.chapter_description, 'Uncategorized') AS chapter_description,
     COALESCE(pop.population, lp.population) as population
 
 FROM stg_sih_rd as s
