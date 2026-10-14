@@ -187,7 +187,8 @@ def chart_hospitalizations_map(df: pd.DataFrame, selected_year: int, geojson_dat
     Returns:
         None
     """
-    df_filtered = df[df["admission_year"]== selected_year]
+    df_filtered = df[df["admission_year"] == selected_year].copy()
+    df_filtered["hospitalizations_per_100k"] = df_filtered["hospitalizations_per_100k"].round(0).astype(int)
     fig = px.choropleth(
     df_filtered,
     geojson=geojson_data,
