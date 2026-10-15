@@ -49,17 +49,26 @@ def chart_avg_length_of_stay(df: pd.DataFrame, min_year_filter: int, max_year_fi
         None
     """
     df_filtered = df[df["admission_year"].between(min_year_filter, max_year_filter)]
-    result = df_filtered.nlargest(10,"avg_days")
+    df_agg = df_filtered.groupby(
+    ["diag_princ", "description", "chapter_description"], as_index=False
+    ).apply(
+        lambda g: pd.Series({
+            "avg_days": (g["avg_days"] * g["count_cases"]).sum() / g["count_cases"].sum(),
+            "count_cases": g["count_cases"].sum(),
+        })
+    ).reset_index(drop=True)
+    result = df_agg.nlargest(10,"avg_days")
     fig = px.bar(
         result,
         x="diag_princ",
         y="avg_days",
-        hover_data=["description"],
+        hover_data=["description","chapter_description"],
         title="Average Days by Diagnosis",
         labels={
             "diag_princ": "Diagnosis (ICD-10)",
             "avg_days": "Average Length of Stay (days)",
-            "description": "Diagnosis name"
+            "description": "Diagnosis name",
+            "chapter_description": "Chapter"
         }
     )
     st.plotly_chart(fig)
@@ -78,17 +87,23 @@ def chart_total_cost(df: pd.DataFrame, min_year_filter: int, max_year_filter: in
         None
     """
     df_filtered = df[df["admission_year"].between(min_year_filter, max_year_filter)]
-    result = df_filtered.nlargest(10,"sum_total_cost_corrected")
+    df_agg = df_filtered.groupby(
+    ["diag_princ", "description", "chapter_description"], as_index=False
+    ).agg(
+        sum_total_cost_corrected=("sum_total_cost_corrected", "sum"),
+    )
+    result = df_agg.nlargest(10,"sum_total_cost_corrected")
     fig = px.bar(
         result,
         x="diag_princ",
         y="sum_total_cost_corrected",
-        hover_data=["description"],
+        hover_data=["description","chapter_description"],
         title="Total Cost Value by Diagnosis",
         labels={
             "diag_princ": "Diagnosis (ICD-10)",
             "sum_total_cost_corrected": "Total Cost Value (reais)",
-            "description": "Diagnosis name"
+            "description": "Diagnosis name",
+            "chapter_description": "Chapter"
         }
     )
     st.plotly_chart(fig)
@@ -108,17 +123,23 @@ def chart_mortality_rate(df: pd.DataFrame, min_year_filter: int, max_year_filter
         None
     """
     df_filtered = df[df["admission_year"].between(min_year_filter, max_year_filter)]
-    result = df_filtered[df_filtered['count_cases']>= min_cases].nlargest(10,"avg_morte")
+    df_agg = df_filtered.groupby(["diag_princ", "description", "chapter_description"], as_index=False).agg(
+    sum_deaths=("sum_deaths", "sum"),
+    count_cases=("count_cases", "sum"),
+    )
+    df_agg["mortality_rate"] = df_agg["sum_deaths"] / df_agg["count_cases"] * 100
+    result = df_agg[df_agg["count_cases"] >= min_cases].nlargest(10, "mortality_rate")
     fig = px.bar(
         result,
         x="diag_princ",
-        y="avg_morte",
-        hover_data=["description"],
+        y="mortality_rate",
+        hover_data=["description","chapter_description"],
         title="Mortality Rate by Diagnosis (%)",
         labels={
             "diag_princ": "Diagnosis (ICD-10)",
-            "avg_morte": "Mortality Rate",
-            "description": "Diagnosis name"
+            "mortality_rate": "Mortality Rate",
+            "description": "Diagnosis name",
+            "chapter_description": "Chapter"
         }
     )
     st.plotly_chart(fig)
@@ -218,6 +239,7 @@ year_range= st.sidebar.slider("Year Range",
                     max_value = year_max,
                     value=(year_min, year_max))
 st.header("By diagnosis")
+st.subheader(f"By diagnosis — {year_range[0]}–{year_range[1]}")
 col1, col2, col3 = st.columns(3)
 with col1: chart_avg_length_of_stay(df["mart_avg_length_of_stay"], year_range[0], year_range[1])
 with col2: chart_total_cost(df["mart_total_cost"], year_range[0], year_range[1])
