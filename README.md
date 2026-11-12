@@ -9,7 +9,7 @@ A cloud-native data engineering project that ingests Brazilian public hospitaliz
 The dashboard is organized in three sections:
 
 ### By diagnosis
-Top diagnoses across three metrics: average length of stay, total inflation-adjusted cost, and mortality rate. Each chart has its own year filter, plus a per-chart minimum-cases threshold for the mortality rate.
+Top diagnoses across three metrics: average length of stay, total inflation-adjusted cost, and mortality rate. Each metric uses correct aggregation across state and year (weighted average for length of stay, straight sum for cost, pooled numerator/denominator for mortality rate — avoiding Simpson's paradox when averaging across subgroups). Charts show the ICD-10 code on the axis, the specific diagnosis name (Portuguese, from DATASUS) in the hover, and the ICD-10 chapter description (English, WHO) alongside — bilingual by design so a reviewer can navigate the structure without reading Portuguese while the specifics stay faithful to the source. Period labels in section headers reflect the active year filter.
 
 <p align="center">
   <img src="docs/dashboard_diagnosis.png" alt="Diagnosis charts">
@@ -90,9 +90,9 @@ SUS Lakehouse downloads monthly hospitalization records from Brazil's public hea
 
 The dashboard currently surfaces five insights:
 
-- **Top diagnoses by average length of stay** — which conditions keep patients hospitalized the longest
+- **Top diagnoses by average length of stay** — which conditions keep patients hospitalized the longest, computed as a true weighted average across subgroups
 - **Top diagnoses by total cost** — where the public health system spends most, adjusted for inflation using the IPCA index
-- **Top diagnoses by mortality rate** — which conditions are most fatal in hospital settings, with a configurable minimum-cases threshold
+- **Top diagnoses by mortality rate** — which conditions are most fatal in hospital settings, computed as pooled `SUM(deaths) / SUM(cases)` across subgroups (not an average of rates), with a configurable minimum-cases threshold
 - **Trends over time** — timeseries chart with selectable metric (hospitalizations, deaths, cost, mortality rate), granularity (year/month), and state comparison mode
 - **Hospitalizations by state** — per-100k-inhabitants comparison across all Brazilian states
 
@@ -119,13 +119,16 @@ The transformation layer follows the medallion pattern with three tiers:
 - `stg_state_population` — annual state population from IBGE
 - `stg_ipca_monthly` — monthly IPCA inflation index from IBGE
 
+**Seeds** — reference data loaded as tables:
+- `cid10` — complete CID-10 reference (14,245 codes) with Portuguese descriptions from DATASUS and English chapter metadata from the WHO ICD-10 standard
+
 **Intermediate** (`int_*`) — business logic and enrichment:
-- `int_internacoes` — hospitalizations joined with CID-10 chapters, inflation-adjusted costs (`val_tot_corrected`), and state population attached
+- `int_internacoes` — hospitalizations joined with the CID-10 seed (direct equality on code), inflation-adjusted costs (`val_tot_corrected`), and state population attached; `COALESCE` fallback marks any uncatalogued codes as `Código <code> (não catalogado)` so unmapped codes surface instead of silently dropping
 
 **Marts** — final aggregated tables powering the dashboard:
-- `mart_avg_length_of_stay` — average hospitalization days by diagnosis, state, year
+- `mart_avg_length_of_stay` — `AVG(dias_perm)` plus `COUNT(*)` by diagnosis, state, year (the count enables correct weighted averages downstream)
 - `mart_total_cost` — total inflation-adjusted cost by diagnosis, state, year
-- `mart_mortality_rate` — mortality rate by diagnosis with case-count guardrails
+- `mart_mortality_rate` — `SUM(morte)` and `COUNT(*)` by diagnosis, state, year (both numerator and denominator exposed, so the dashboard can compute pooled rates for any filter)
 - `mart_monthly_trend` — monthly hospitalizations, deaths, and cost by state (feeds the timeseries chart)
 - `mart_hospitalizations_by_state` — hospitalizations per 100k inhabitants by state and year
 
@@ -133,7 +136,7 @@ All marts include `data_tests` in `schema.yml` — `not_null`, `strictly_positiv
 
 ## Project phases
 
-This project was built in six incremental phases, each adding one new tool or concept on top of a working baseline.
+This project was built incrementally, each phase adding one new tool or concept on top of a working baseline.
 
 ### Phase 1 — Local MVP
 Downloaded SIH/RD `.dbc` files directly from the DATASUS FTP server, converted them to parquet locally, and built a basic Streamlit dashboard reading from local files. All running on a laptop, no cloud involved.
@@ -169,6 +172,11 @@ Added a second Cloud Run Job that pulls state population estimates and monthly I
 Packaged the dbt project into a Docker image with `method: oauth` authentication (no keyfile needed inside the container — Cloud Run's attached service account is picked up automatically) and deployed it as a third Cloud Run Job triggered by its own Cloud Scheduler. dbt now runs `dbt run && dbt test` monthly, a few hours after ingestion completes. On the dashboard side, added a timeseries chart (selectable metric, granularity, and state-comparison mode) and a Brazil choropleth map showing hospitalizations per 100k inhabitants by state.
 
 **Tools added:** Dedicated dbt Docker image, third Cloud Run Job pipeline, Plotly choropleth
+
+### Phase 8 — Analytical correctness
+Replaced the chapter-only CID-10 seed with the complete 14,245-code DATASUS CID-10 reference, enabling diagnosis-level labels throughout the dashboard. Supplemented twelve codes added by WHO after the DATASUS reference was published (CKD stages N182-N185, post-COVID U09/U10, follicular lymphoma subtypes C823-C826). Added a `COALESCE` fallback so uncatalogued codes surface visibly in the dashboard instead of silently dropping. On the dashboard side, fixed row-explosion bugs in all three "By diagnosis" charts (previously showing stacked bars because mart rows were per state/year, not per diagnosis) and switched to statistically correct aggregation: weighted average for length of stay, pooled `SUM(deaths) / SUM(cases)` for mortality — avoiding Simpson's paradox when a diagnosis's rate varies across subgroups with different volumes. Added ICD-10 chapter descriptions (English) to chart hovers alongside the Portuguese diagnosis names, making the dashboard navigable by non-Portuguese-speaking reviewers without compromising source fidelity.
+
+**Tools added:** DATASUS CID-10 reference, weighted-mean and pooled-rate aggregation patterns
 
 ## Setup
 
@@ -297,8 +305,6 @@ docker push southamerica-east1-docker.pkg.dev/YOUR-PROJECT-ID/sus-lakehouse/stre
 gcloud run deploy sus-lakehouse-dashboard --image=southamerica-east1-docker.pkg.dev/YOUR-PROJECT-ID/sus-lakehouse/streamlit:latest --region=southamerica-east1
 ```
 
-
-
 ## Project structure
 
 ```
@@ -309,6 +315,7 @@ sus-lakehouse/
 │   └── Dockerfile
 ├── dashboard/               # Streamlit dashboard
 │   ├── app.py
+│   ├── data/                # Static assets (Brazilian states GeoJSON for the choropleth)
 │   ├── Dockerfile
 │   └── requirements.txt
 ├── dbt/                     # dbt project (medallion architecture)
@@ -316,7 +323,7 @@ sus-lakehouse/
 │   │   ├── staging/         # Raw data type-casting and cleaning
 │   │   ├── intermediate/    # Business logic, CID-10 joins, inflation adjustment
 │   │   └── mart/            # Final aggregated tables for dashboard
-│   ├── seeds/               # Reference data (CID-10 chapters)
+│   ├── seeds/               # Reference data (complete CID-10 with chapter metadata)
 │   ├── tests/generic/       # Custom data quality tests
 │   ├── dbt_project.yml
 │   ├── profiles.prod.yml    # Profile used inside the Cloud Run Job (method: oauth)
@@ -336,8 +343,9 @@ sus-lakehouse/
 │   ├── outputs.tf
 │   └── versions.tf
 ├── docs/                    # Documentation and screenshots
-│   ├── dashboard.png
-│   ├── dashboard_filtered.png
+│   ├── dashboard_diagnosis.png
+│   ├── dashboard_trends.png
+│   ├── dashboard_map.png
 │   └── dic.pdf              # SIH/RD data dictionary
 ├── pyproject.toml           # Python dependencies (local dev)
 ├── uv.lock                  # Lockfile
@@ -357,6 +365,18 @@ Raw data lives in GCS as parquet, and BigQuery reads it via external tables. Thi
 ### Inflation-adjusted costs from Phase 6 onwards
 
 Nominal hospitalization costs (`val_tot` in the SIH data) can't be meaningfully compared across years because Brazilian inflation shifts the real value of the currency. The intermediate model uses the monthly IPCA index to normalize each record's cost to a common reference month, producing `val_tot_corrected` — a cost in constant reais. This is why the dashboard's "total cost" chart is inflation-adjusted and why year-over-year comparisons in the timeseries chart are meaningful.
+
+### Bilingual CID-10 seed (Portuguese descriptions, English chapter structure)
+
+The CID-10 seed carries diagnosis names in Portuguese (verbatim from DATASUS, the authoritative source for Brazilian health data) and chapter metadata in English (from the WHO ICD-10 standard). Mixing languages is deliberate: the Portuguese names are the official reference and translating ~14,000 medical labels mechanically would introduce subtle errors in a domain where "icterohemorrágica" has to go to "icterohaemorrhagic," not "jaundice-bleeding." Keeping the chapter structure in English makes the dashboard navigable to non-Portuguese-speaking reviewers at the level that matters most — "where in the body does this live, which organ system is affected" — while the specifics stay faithful to the source. The dashboard shows both in the hover of each bar chart.
+
+### Expose numerators and denominators separately, aggregate in the dashboard
+
+Mart tables carry raw sums (`SUM(morte) as sum_deaths`, `COUNT(*) as count_cases`) rather than pre-computed rates. The dashboard then computes rates and weighted averages after filtering by year. This avoids Simpson's paradox: averaging an average, or averaging a rate, across subgroups of different sizes gives mathematically different (and often misleading) answers than computing the pooled statistic from the underlying totals. Exposing the raw sums costs nothing (BigQuery storage for integers is negligible) and future-proofs the marts for any new chart that needs a correct aggregated statistic.
+
+### `COALESCE` fallback for uncatalogued codes
+
+The `int_internacoes` join wraps every CID-10 lookup in `COALESCE(c.description, 'Código ' || s.diag_princ || ' (não catalogado)')`. If a diagnosis code exists in the SIH data but not in the seed (e.g., a WHO code published after the DATASUS reference was last updated), the row is kept with a visible fallback label rather than silently dropped. The alternative — a `WHERE c.code IS NOT NULL` filter — would hide data gaps from downstream consumers. Making unmatched codes visible in the dashboard turns the gap into a signal: a future maintainer can spot the pattern and add missing codes to the seed.
 
 ### Cloud Run Jobs instead of Cloud Composer for ingestion
 
